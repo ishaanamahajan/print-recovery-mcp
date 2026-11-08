@@ -171,6 +171,57 @@ At least one of the force and the moment must be positive. A shift of at least t
   - Uses beam theory on a solid rectangle. It ignores infill and perimeters, stress concentration at the step, and fatigue.
   - The interlayer factor is a user assumption and should be measured.
 
+## Demo record
+
+- [`demo/inspector_transcript.md`](demo/inspector_transcript.md): MCP Inspector (CLI mode) calls with full responses:
+  - the tool list with schemas;
+  - two HW4 tools;
+  - both new tools;
+  - three invalid inputs, covering a schema range, a domain rule and a new tool.
+- [`demo/claude_code_transcript.md`](demo/claude_code_transcript.md): Claude Code calling the tools from plain-language questions, including a unit conversion (480 min → 8 h).
+
+## Client / server boundary
+
+**Server (this repo):**
+- the equations;
+- unit and range validation, and the input schemas that publish it;
+- typed structured results;
+- error messages.
+
+It is deterministic and stateless, makes no network calls, and cannot send commands to a printer.
+
+**Client (Claude Code, Claude Desktop, Inspector):**
+- understanding the request;
+- converting units (minutes → hours, percent → fraction, diameter → radius);
+- choosing the tool;
+- asking for missing inputs instead of inventing them;
+- explaining the result.
+
+**Human:** makes the decision. The server can report STOP, but it never stops a print.
+
+## Link to user research (HW5 requirements)
+
+| Requirement | Interview evidence | Tool |
+|---|---|---|
+| R1: Detect failures early | Unattended overnight prints; adhesion and warping failures that spaghetti detection misses; wanting to pause prints in advance | `early_stop_trend_alarm` |
+| R2: Judge function, not appearance | Visually imperfect parts are acceptable if they work; a part that looks fine may still be structurally weak | `layer_shift_strength_check`, `check_functional_geometry` |
+| R3: Evidence and approval before changes | Distrust of automatic correction | All tools are read-only and return intermediate values |
+| R5: Run offline | Concern about proprietary designs in the cloud | Local stdio server, no network |
+
+## What a human should verify before acting
+
+- **All tools:** check that the arguments the client sent match the real part and printer. Units are the most likely source of error.
+- **`early_stop_trend_alarm`:**
+  - look at the print before cancelling;
+  - the trend is a straight-line extrapolation, and a low `trend_r_squared` means it is unreliable;
+  - the input measurements are not verified by the tool.
+- **`layer_shift_strength_check`:**
+  - use measured strength values;
+  - halving `interlayer_strength_factor` from 0.5 to 0.25 drops the demo safety factor from 4.57 to about 2.3;
+  - the model ignores infill, stress concentration at the step and fatigue;
+  - for load-critical parts, pull-test a coupon with the same shift.
+- **`check_recovery_feasibility` / `expected_recovery_savings`:** the per-layer correction limit and the success probability are assumptions that should be measured.
+
 ## Repository layout
 
 ```
@@ -178,6 +229,7 @@ tools.py       pure-Python tool functions (HW4 tools verbatim + 2 new); no MCP d
 server.py      MCP server: schemas, result models, annotations, error mapping
 tests/         pytest: hand-checked values, edge cases, invalid inputs, in-process MCP calls
 demo/          Inspector CLI script + transcript, Claude Code transcript
+LICENSE        MIT
 ```
 
 ## AI usage
